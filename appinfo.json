@@ -1,0 +1,24 @@
+{
+    "appKeys": {},
+    "capabilities": [
+        ""
+    ],
+    "companyName": "Tm4n",
+    "enableMultiJS": true,
+    "longName": "PebbleBars",
+    "projectType": "native",
+    "resources": {
+        "media": []
+    },
+    "sdkVersion": "3",
+    "shortName": "PebbleBars",
+    "targetPlatforms": [
+        "aplite",
+        "basalt"
+    ],
+    "uuid": "3d3dadaf-8d1b-46f1-8ef3-61ccdf350e5d",
+    "versionLabel": "0.1",
+    "watchapp": {
+        "watchface": true
+    }
+}
