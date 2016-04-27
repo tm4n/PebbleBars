@@ -3,52 +3,63 @@
 
 #include <pebble.h>
 
+#define cfg_nodots
+
 static Window *s_window;
 static Layer *s_canvas;
 static TextLayer *s_text_hour;
 static TextLayer *s_text_minute;
+static GRect text_hour_frame = {.origin = {.x = 12, .y = 59}, .size = {.w = 60, .h = 30}};
+static GRect text_minute_frame = {.origin = {.x = 74, .y = 59}, .size = {.w = 60, .h = 30}};
 
 static int s_minute;
 static int s_hour;
 
+static int pos_hourbar_y = 22;
+static int width_hourbar = 40;
+static int pos_minutebar_y = 84;
+static int width_minutebar = 40;
+static int hourbar_length = 0;
+static int minutebar_length = 0;
+static int hourbar_max = 168-10;
+static int minutebar_max = 168-10;
+
+// Update hourbars
 static void layer_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
-
-  int hourbar_max = (double)(bounds.size.h-10);
-  int minbar_max = (double)(bounds.size.h-10);
+  
   //////////////////////////////////////
   // draw calls here
   graphics_context_set_fill_color(ctx, GColorOrange);
   graphics_context_set_stroke_color(ctx, GColorOrange);
   graphics_context_set_stroke_width(ctx, 20);
   
-  // 12 hours only, with a minimum size
-  s_hour -= (s_hour > 12) ? 12 : 0;
-  
+  #ifndef cfg_nodots
   // draw dots for hours
   for (int i = 0; i < 13; i++)
   {
-    graphics_draw_pixel(ctx, GPoint(18, 5.+(double)i*((double)hourbar_max/12.)));
-    graphics_draw_pixel(ctx, GPoint(17, 5.+(double)i*((double)hourbar_max/12.)));
-    graphics_draw_pixel(ctx, GPoint(16, 5.+(double)i*((double)hourbar_max/12.)));
+    graphics_draw_pixel(ctx, GPoint(pos_hourbar_y-2, 5.+(double)i*((double)hourbar_max/12.)));
+    graphics_draw_pixel(ctx, GPoint(pos_hourbar_y-3, 5.+(double)i*((double)hourbar_max/12.)));
+    graphics_draw_pixel(ctx, GPoint(pos_hourbar_y-4, 5.+(double)i*((double)hourbar_max/12.)));
   }
+  #endif
   
   // draw bar for hours
-  int hourbar_length = ((double)s_hour/12.) * (double)hourbar_max +1;
-  graphics_fill_rect(ctx, GRect(20, bounds.size.h - hourbar_length - 5, 40, hourbar_length + 1), 0, 0);
+
+  graphics_fill_rect(ctx, GRect(pos_hourbar_y, bounds.size.h - hourbar_length - 5, width_hourbar, hourbar_length + 1), 0, 0);
   
-  
+  #ifndef cfg_nodots
   // draw limited amounts of dots for minutes
   for (int i = 0; i < 5; i++)
   {
-    graphics_draw_pixel(ctx, GPoint(92, 5.+(double)i*((double)minbar_max/4.))); 
-    graphics_draw_pixel(ctx, GPoint(91, 5.+(double)i*((double)minbar_max/4.)));
-    graphics_draw_pixel(ctx, GPoint(90, 5.+(double)i*((double)minbar_max/4.)));
+    graphics_draw_pixel(ctx, GPoint(pos_minutebar_y-2, 5.+(double)i*((double)minbar_max/4.))); 
+    graphics_draw_pixel(ctx, GPoint(pos_minutebar_y-3, 5.+(double)i*((double)minbar_max/4.)));
+    graphics_draw_pixel(ctx, GPoint(pos_minutebar_y-4, 5.+(double)i*((double)minbar_max/4.)));
   }
+  #endif
   
   // draw bar for minutes
-  int minbar_length = ((double)s_minute/60.) * (double)minbar_max +1;
-  graphics_fill_rect(ctx, GRect(94, bounds.size.h - minbar_length - 5, 40, minbar_length + 1), 0, 0);
+  graphics_fill_rect(ctx, GRect(pos_minutebar_y, bounds.size.h - minutebar_length - 5, width_minutebar, minutebar_length + 1), 0, 0);
 }
 
 
@@ -67,8 +78,8 @@ static void main_window_load(Window *window) {
   
   /////////////////////////////////////////////////////// text
   // Create the TextLayer with specific bounds
-  s_text_hour = text_layer_create(GRect(10, 59, 60, 50));
-  s_text_minute = text_layer_create(GRect(84, 59, 60, 50));
+  s_text_hour = text_layer_create(text_hour_frame);
+  s_text_minute = text_layer_create(text_minute_frame);
 
   // Improve the layout to be more like a watchface
   text_layer_set_background_color(s_text_hour, GColorClear);
@@ -96,9 +107,16 @@ static void main_window_unload(Window *window) {
   window_destroy(s_window);
 }
 
+// update texts and defer hourbar update
 static void tick_handler(struct tm *time_now, TimeUnits units_changed) {
+  Layer *window_layer = window_get_root_layer(s_window);
+  GRect bounds = layer_get_bounds(window_layer);
+  
   s_hour = time_now->tm_hour;
+  s_hour -= (s_hour > 12) ? 12 : 0;
   s_minute = time_now->tm_min;
+  hourbar_length = ((double)s_hour/12.) * (double)hourbar_max +1;
+  minutebar_length = ((double)s_minute/60.) * (double)minutebar_max +1;
   
   // update text layers
   // Write the current hours and minutes into a buffer
@@ -110,6 +128,19 @@ static void tick_handler(struct tm *time_now, TimeUnits units_changed) {
   // Display this time on the TextLayer
   text_layer_set_text(s_text_hour, s_buffer_h);
   text_layer_set_text(s_text_minute, s_buffer_m);
+  
+  // move textlayers, mark for redraw
+  text_hour_frame.origin.y = bounds.size.h - hourbar_length - 45;
+  text_hour_frame.origin.y = text_hour_frame.origin.y < 0 ? 0 : text_hour_frame.origin.y;
+  Layer *hour_layer = text_layer_get_layer(s_text_hour);
+  layer_set_frame(hour_layer, text_hour_frame);
+  layer_mark_dirty(hour_layer);
+  
+  text_minute_frame.origin.y = bounds.size.h - minutebar_length - 45;
+  text_minute_frame.origin.y = text_minute_frame.origin.y < 0 ? 0 : text_minute_frame.origin.y;
+  Layer *minute_layer = text_layer_get_layer(s_text_minute);
+  layer_set_frame(minute_layer, text_minute_frame);
+  layer_mark_dirty(minute_layer);
   
   // Initiate redraw, so layer_update_proc gets called
   layer_mark_dirty(s_canvas); 
